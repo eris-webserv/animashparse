@@ -153,6 +153,8 @@ export class CreatureFile {
     }
 
     const imageLen = p.getLong();
+    // getBytes clamps to available data, so imageBytes.length may be less than imageLen
+    // if the file is truncated (e.g. a hacked save with a wrong stored length).
     this.imageBytes = p.getBytes(imageLen);
   }
 

@@ -43,8 +43,15 @@ async function allJournalImageFiles(): Promise<{ name: string; animalA: string; 
 // CreatureFile
 // ---------------------------------------------------------------------------
 
-Deno.test("CreatureFile: fromBytes → toBytes bytematches original (all files)", async () => {
+// creature_3.bytes is a modded save (stdlel's hobby project): the stored image
+// length (360320) doesn't match the actual bytes in the file (213498). The parser
+// reads what's there and corrects the stored length on re-encode, so a strict
+// byte-match is impossible for it.
+const TRUNCATED_SAVES = new Set(["creature_3.bytes"]);
+
+Deno.test("CreatureFile: fromBytes → toBytes bytematches original (all valid files)", async () => {
   for (const { name, saveId } of await allCreatureFiles()) {
+    if (TRUNCATED_SAVES.has(name)) continue;
     const original = await Deno.readFile(`${SAVE_DIR}/${name}`);
     const creature = new CreatureFile(original, saveId);
     assertBytesEqual(new Uint8Array(creature.toBytes()), new Uint8Array(original), name);
