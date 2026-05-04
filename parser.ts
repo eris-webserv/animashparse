@@ -153,9 +153,13 @@ export class CreatureFile {
     }
 
     const imageLen = p.getLong();
-    // getBytes clamps to available data, so imageBytes.length may be less than imageLen
-    // if the file is truncated (e.g. a hacked save with a wrong stored length).
     this.imageBytes = p.getBytes(imageLen);
+    if (this.imageBytes.length !== imageLen) {
+      console.warn(
+        `[CreatureFile] saveId ${saveId}: stored image length ${imageLen} ` +
+        `but only ${this.imageBytes.length} bytes available — file may be truncated or modded`,
+      );
+    }
   }
 
   toBytes(): Buffer {
