@@ -10,8 +10,8 @@
  *   [M bytes]  raw image (PNG or JPEG)
  *
  * Journal/<animalA> + <animalB>.bytes — obfuscated mini-image:
- *   [Byte]    n  (random padding length, 3–14, from Unity Random.Range(3,15))
- *   [n bytes] random garbage
+ *   [Byte]    n  (stored skip count; the n padding bytes are random, but n itself is not)
+ *   [n bytes] random garbage (Unity Random.Range(0,250) each, Range(3,15) values for n)
  *   [rest]    raw PNG
  *
  * Journal/all_entries.txt — plain text index:
