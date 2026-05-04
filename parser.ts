@@ -88,6 +88,12 @@ class PacketReader {
 class PacketWriter {
   private chunks: Buffer[] = [];
 
+  putByte(n: number): void {
+    const b = Buffer.alloc(1);
+    b.writeUInt8(n);
+    this.chunks.push(b);
+  }
+
   putShort(n: number): void {
     const b = Buffer.alloc(2);
     b.writeInt16LE(n);
@@ -213,93 +219,3 @@ export class JournalFile {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Journal index (all_entries.txt)
-// ---------------------------------------------------------------------------
-
-export function parseJournalIndex(text: string): JournalIndexEntry[] {
-  return text
-    .split("\n")
-    .map((line) => {
-      const m = line.trim().match(/^(.+?)\s+\+\s+(.+?)\s+=\s+(.+?)\s+\((\d+)\)$/);
-      if (!m) return null;
-      return { animalA: m[1], animalB: m[2], hybridName: m[3], saveId: parseInt(m[4], 10) };
-    })
-    .filter((e): e is JournalIndexEntry => e !== null);
-}
-
-// ---------------------------------------------------------------------------
-// Filesystem helpers (Deno)
-// ---------------------------------------------------------------------------
-
-export async function loadAllCreatures(dir: string): Promise<CreatureFile[]> {
-  const files: CreatureFile[] = [];
-  for await (const entry of Deno.readDir(dir)) {
-    const m = entry.name.match(/^creature_(\d+)\.bytes$/);
-    if (!m) continue;
-    const data = await Deno.readFile(`${dir}/${entry.name}`);
-    files.push(new CreatureFile(data, parseInt(m[1], 10)));
-  }
-  return files.sort((a, b) => a.saveId - b.saveId);
-}
-
-export async function loadAllJournalFiles(dir: string): Promise<JournalFile[]> {
-  const files: JournalFile[] = [];
-  for await (const entry of Deno.readDir(dir)) {
-    const m = entry.name.match(/^(.+?)\s+\+\s+(.+?)\.bytes$/);
-    if (!m) continue;
-    const data = await Deno.readFile(`${dir}/${entry.name}`);
-    files.push(new JournalFile(data, m[1], m[2]));
-  }
-  return files;
-}
-
-// ---------------------------------------------------------------------------
-// CLI — deno run --allow-read --allow-write parser.ts <save-root> [out-dir]
-// ---------------------------------------------------------------------------
-
-if (import.meta.main) {
-  const root = Deno.args[0] ?? ".";
-  const outDir = Deno.args[1];
-
-  if (outDir) await Deno.mkdir(outDir, { recursive: true });
-
-  const creatures = await loadAllCreatures(`${root}/SavedAnimals`);
-  console.log(`Loaded ${creatures.length} creature(s):`);
-  for (const c of creatures) {
-    console.log(`  [${c.saveId}] ${c.stats["Name"] ?? "(unknown)"}`);
-    if (outDir) {
-      const base = `${outDir}/creature_${c.saveId}`;
-      await Deno.writeTextFile(`${base}.json`, JSON.stringify(c.toJSON(), null, 2));
-      await Deno.writeFile(`${base}.png`, c.imageBytes);
-    }
-  }
-
-  const journalFiles = await loadAllJournalFiles(`${root}/Journal`);
-  console.log(`\nJournal images: ${journalFiles.length}`);
-  for (const j of journalFiles) {
-    console.log(`  ${j.animalA} + ${j.animalB}  (${j.imageBytes.length} bytes)`);
-    if (outDir) {
-      const base = `${outDir}/${j.animalA} + ${j.animalB}`;
-      await Deno.writeFile(`${base}.png`, j.imageBytes);
-    }
-  }
-
-  const indexPath = `${root}/Journal/all_entries.txt`;
-  try {
-    const text = await Deno.readTextFile(indexPath);
-    const entries = parseJournalIndex(text);
-    console.log(`\nJournal index (${entries.length} entries):`);
-    for (const e of entries) {
-      console.log(`  ${e.animalA} + ${e.animalB} = ${e.hybridName} (saveId ${e.saveId})`);
-    }
-    if (outDir) {
-      await Deno.writeTextFile(
-        `${outDir}/journal_index.json`,
-        JSON.stringify(entries, null, 2),
-      );
-    }
-  } catch {
-    console.log("\nNo journal index found.");
-  }
-}
